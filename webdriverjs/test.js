@@ -1,0 +1,70 @@
+const {Builder, By, Key, until} = require('selenium-webdriver');
+const { expect } = require('chai')
+
+const roomKicker = "Kicker"
+const artworkUrl = "https://gfx-stage.nrk.no/L6qb03_FVBFgi2cLP88yYgxyjWQ9V2wbhcnEZqHrrrfA"
+
+
+async function runTest(browsername, url){
+    const start = new Date()
+    let driver = await new Builder()
+	.withCapabilities({
+	    "browserstack.local": "true"
+	})
+	.forBrowser(browsername)
+	.usingServer('http://localhost:4444/wd/hub')
+	.build();
+    try{
+	await driver.manage().setTimeouts({implicit:10000})
+	await driver.manage().setTimeouts({script:10000})
+	await driver.get(url)
+	await test(driver)
+	console.log("complete!", new Date() - start, "ms spent")
+    } catch(error) {
+	console.error(error)
+	console.log("debug time!")
+    } finally {
+	await driver.quit() 
+    }   
+}
+
+async function logIn(driver){
+    await driver.findElement(By.css('#username_input'))
+	.sendKeys(`n${Math.floor(Math.random()*10000)}`,Key.ENTER)
+}
+
+async function createHouse(driver){
+    await driver.findElement(By.css('[data-automation="house-settings:"]')).click()
+    await driver.findElement(By.css('[data-automation="add-new-house:"]')).click()
+}
+
+async function test(driver){
+    await logIn(driver)
+    await createHouse(driver)
+    await driver.findElement(By.css('#addFloor')).click()
+    await driver.findElement(By.css('#room_kicker')).sendKeys(roomKicker, Key.ENTER)
+    await driver.findElement(By.css('#room_artwork_source')).sendKeys(artworkUrl, Key.ENTER)
+    const roomId = await driver.findElement(By.css('.house-builder__room--selected')).getAttribute('room-id')
+    //Something is weird with the cache stuff... need to put a sleep here as well
+    await driver.sleep(100)
+    
+    const state = await driver.executeAsyncScript(function() {
+	const done = arguments[arguments.length - 1]
+	//webdriverjs does not seem to support sending async functions, so made a wrapper like this
+	async function test(){
+	    const caches = window.caches;
+	    const cache = await caches.open('kurator::preview');
+	    const response = await cache.match('api/preview');
+	    const state = await response.json();
+	    return state
+	}
+	test()
+	    .then(done)
+    })
+    const { artwork, kicker } = state.entities.rooms[`${roomId}`]
+    expect(kicker).to.equal(roomKicker)
+    expect(artwork.source).to.equal(artworkUrl)
+}
+
+
+runTest('chrome','https://kurator-back-office-feature-2480.kubeint.nrk.no/login')

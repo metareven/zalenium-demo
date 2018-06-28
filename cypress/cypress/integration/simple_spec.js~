@@ -1,0 +1,9 @@
+describe('My First Test', function() {
+  it('Does shit', function() {
+      cy.visit('https://kurator-back-office-stage.nrk.no/')
+      cy.get('#username_input').type("n635412{enter}")
+      cy.get('.house-selector__house-name[data-house-id="143915"]').click("topLeft")
+      cy.get('#previewHouse').click()
+      
+  })
+})
